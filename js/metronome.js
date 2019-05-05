@@ -1,41 +1,35 @@
 const NOTELENGTH = 0.01;      // length of "beep" (in seconds)
 
-// timerWorker enum
-const START = 'start';
-const STOP  = 'stop';
-const PLAY  = 'play';
-const TICK  = 'tick';
-
 class Metronome {
     constructor() {
         // Audio setup
-        this.audioCtx = new AudioContext();
-        this.isPlaying = false;
+        this.audioCtx        = new AudioContext();
+        this.isPlaying       = false;
         this.current16thNote = 0;     // What note is currently last scheduled?
-        this.tempo = 120.0; // Tempo (in beats per minute)
-        this.lookahead = 25.0;  // How frequently to call scheduling function (in ms)
-        this.notesInQueue = [];    // the notes that have been put into the web audio,
+        this.tempo           = 120.0; // Tempo (in beats per minute)
+        this.lookahead       = 0.025;  // How frequently to call scheduling function (sec)
+        this.notesInQueue    = [];    // the notes that have been put into the web audio,
         // and may or may not have played yet. {note, time}
         
         this.scheduleAheadTime = 0.1; // How far ahead to schedule audio (sec)
         // This is calculated from lookahead, and overlaps 
         // with next interval (in case the timer is late)
         
-        this.nextNoteTime = 0.0; // when the next note is due.
+        this.nextNoteTime   = 0.0; // when the next note is due.
         this.noteResolution = 0;   // 0 = 16th, 1 = 8th, 2 = quarter note
 
         // Visuals setup 
-        this.canvas = document.createElement('canvas');
-        this.canvasContext = this.canvas.getContext('2d');
+        this.canvas            = document.createElement('canvas');
+        this.canvasContext     = this.canvas.getContext('2d');
         this.last16thNoteDrawn = -1; // the last "box" we drew on the screen
         
-        this.canvas.width = window.innerWidth;
+        this.canvas.width  = window.innerWidth;
         this.canvas.height = window.innerHeight;
 
         this.canvasContext.strokeStyle = "#ffffff";
-        this.canvasContext.lineWidth = 2;
+        this.canvasContext.lineWidth   = 2;
         
-        const container = document.createElement('div');
+        const container     = document.createElement('div');
         container.className = "container";
         document.body.appendChild(container);
         container.appendChild(this.canvas);
@@ -55,16 +49,11 @@ class Metronome {
             this.noteResolution = event.target.selectedIndex;
         }
 
-        // Timer setup
-        this.timerWorker = new Worker("js/metronomeworker.js");// The Web Worker used to fire timer messages
-        this.timerWorker.onmessage = e => {
-            if (e.data === TICK) {
-                this.scheduler();
-            };
-        };
-            
         requestAnimationFrame(() => this.draw());    // start the drawing loop and the timer.
-        this.timerWorker.postMessage({ "interval": this.lookahead });
+        // this.timerWorker.postMessage({ "interval": this.lookahead });
+        requestAnimationFrame(() => this.timer()); 
+
+        this.timerLastCalled = this.time;
     }
     
     get time() {
@@ -117,15 +106,15 @@ class Metronome {
     
     play() {
         this.isPlaying = !this.isPlaying;
-    
-        if (this.isPlaying) { // start playing
-            this.current16thNote = 0;
-            this.nextNoteTime = this.time;
-            this.timerWorker.postMessage(START);
+
+        if (!this.isPlaying) {
             return;
         }
-        
-        this.timerWorker.postMessage(STOP);
+    
+        // We've started playing, so initialize these values
+        this.current16thNote = 0;
+        this.nextNoteTime    = this.time;
+        this.timerLastCalled = this.time;
     }
     
     draw() {
@@ -152,6 +141,20 @@ class Metronome {
     
         // set up to draw again
         requestAnimationFrame(() => this.draw());
+    }
+
+    // Checks the current time and fires a callback on sixteenth notes
+    timer() {
+        // First, ensure this will run with every animation frame
+        requestAnimationFrame(() => this.timer());
+
+        const time = this.time;
+        if (time - this.timerLastCalled >= this.lookahead) {
+            this.timerLastCalled = this.time;
+            if (this.isPlaying) {
+                this.scheduler();
+            }
+        }
     }
 }
 
