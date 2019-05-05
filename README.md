@@ -2,6 +2,7 @@
 
 This project is a fork of https://github.com/cwilso/metronome, updated to take advantage of ES2015's features. 
 It shows how to use a combination of requestAnimationFrame and the Webaudio scheduler to achieve stable audio timing.
+You can use the metronome by going to https://joelhobson.github.io/ES2015-Metronome/
 
 # Motivation
 
